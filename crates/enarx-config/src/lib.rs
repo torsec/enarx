@@ -140,6 +140,10 @@ pub struct Config {
     #[serde(default)]
     pub steward: Option<Url>,
 
+    /// An optional Trust Monitor URL - JC
+    #[serde(default)]
+    pub tm: Option<Url>,
+
     /// The arguments to provide to the application
     #[serde(default)]
     pub args: Vec<String>,
@@ -166,6 +170,7 @@ impl Default for Config {
             args: vec![],
             files,
             steward: None, // TODO: Default to a deployed Steward instance
+            tm: None
         }
     }
 }
