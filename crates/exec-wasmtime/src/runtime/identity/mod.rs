@@ -2,8 +2,8 @@
 
 //! Functionality for establishing keep identity.
 
-mod pki;
-mod platform;
+pub(crate) mod pki;
+pub(crate) mod platform;
 
 use pki::PrivateKeyInfoExt;
 use platform::{Platform, Technology};
@@ -11,7 +11,7 @@ use std::str::FromStr;
 
 use std::time::Duration;
 
-use anyhow::{bail, Context};
+use anyhow::{bail, Context, Ok};
 use const_oid::db::rfc5280::{
     ID_CE_BASIC_CONSTRAINTS, ID_CE_EXT_KEY_USAGE, ID_CE_KEY_USAGE, ID_KP_CLIENT_AUTH,
     ID_KP_SERVER_AUTH,
@@ -119,7 +119,7 @@ pub fn generate() -> anyhow::Result<(Zeroizing<Vec<u8>>, Vec<u8>)> {
     };
 
     let attestation_report = platform.attest(&key_hash).context("failed to attest")?;
-
+    
     // Create extensions.
     let ext = vec![Extension {
         extn_id: platform.technology().into(),
@@ -150,9 +150,25 @@ pub fn steward(url: &Url, csr: impl AsRef<[u8]>) -> anyhow::Result<Vec<Vec<u8>>>
     response.into_reader().read_to_end(&mut body)?;
 
     // Decode the certificate chain.
-    let path = PkiPath::from_der(&body)?;
-    path.iter().rev().map(|c| Ok(c.to_der()?)).collect()
+    let path: Vec<x509_cert::certificate::CertificateInner> = PkiPath::from_der(&body)?;
+
+    return path.iter().rev().map(|c| Ok(c.to_der()?)).collect();
 }
+
+/* Thesis TM 2.0 Integration - JC */
+#[instrument(skip(agg_data))]
+pub fn trust_monitor(url: &Url, agg_data: impl AsRef<[u8]>) -> anyhow::Result<String> {
+
+    // Send to the TM the certificate chain previously retrieved from the Steward
+    let response = ureq::post(url.as_str())
+        .send_bytes(agg_data.as_ref())?;
+
+    let _status_code = response.status().to_string();
+    let status_text = response.status_text().to_owned();
+
+    Ok(status_text) 
+}
+/**********************************/
 
 #[instrument(skip(key))]
 pub fn selfsigned(key: impl AsRef<[u8]>) -> anyhow::Result<Vec<Vec<u8>>> {
